@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oliver Kell 策略分析器 (书本对应版)</title>
+    <title>Oliver Kell 策略分析器 (完整定稿版)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; background-color: #f4f6f8; color: #333; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
@@ -21,7 +20,7 @@
         .cycle-box { 
             background: #edf2f7; padding: 15px; border-radius: 8px; 
             border: 2px solid transparent; opacity: 0.6; transition: all 0.3s; 
-            position: relative; min-height: 130px; cursor: default;
+            position: relative; min-height: 140px; cursor: default;
         }
         .cycle-box h3 { margin: 0 0 5px 0; font-size: 15px; color: #2d3748; }
         .cycle-box p { margin: 0; font-size: 12px; color: #718096; line-height: 1.4; }
@@ -62,9 +61,13 @@
             color: #2b6cb0; font-size: 12px; border: 1px solid #cbd5e0; margin-right: 10px;
         }
         
+        /* 书本引用样式 */
         .book-quote { 
             font-size: 12px; color: #718096; background-color: #f7fafc; 
             padding: 8px; border-radius: 4px; border-left: 3px solid #cbd5e0; font-style: italic; line-height: 1.4;
+        }
+        .action-tag {
+            display: inline-block; background: #2b6cb0; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; margin-right: 5px; font-style: normal;
         }
 
         .status-check { font-weight: bold; font-size: 13px; }
@@ -79,13 +82,17 @@
 
         #errorMsg { color: #e53e3e; margin-top: 10px; display: none; }
         #result { display: none; }
+        
+        @media (max-width: 768px) {
+            .cycle-container { grid-template-columns: 1fr 1fr; }
+        }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h1>📊 Oliver Kell 策略分析器</h1>
-    <p style="font-size:12px; color:#666;">量化逻辑严格对照《Victory in Stock Trading》原文标准</p>
+    <p style="font-size:12px; color:#666;">量化逻辑与操作建议严格对照《Victory in Stock Trading》原文</p>
     
     <div class="input-group">
         <input type="text" id="symbol" placeholder="输入代码 (如 TSLA)" value="TSLA">
@@ -100,68 +107,72 @@
                 <h3>1. 下跌/筑底</h3>
                 <span class="sub-label">第一阶段最后时刻</span>
                 <p style="margin-top:5px">Price < 20 EMA<br>等待 Reversal Extension</p>
-                <span class="book-def">"Generally capitulation and a sign that the market is bottoming." (Page 9)</span>
-                <button class="detail-btn" onclick="toggleDetail('detail-reversal')">量化标准 ▼</button>
+                <span class="book-def">"Generally capitulation... market is bottoming." (Page 9)</span>
+                <button class="detail-btn" onclick="toggleDetail('detail-reversal')">标准与建议 ▼</button>
             </div>
             
             <div id="box-wedgepop" class="cycle-box">
                 <h3>2. 楔形向上突破</h3>
                 <p>昨日 < 20 EMA<br>今日 > 20 EMA</p>
                 <span class="book-def">"Recaptures the tight 10/20 EMA... Confirmation previous reversal is valid." (Page 10)</span>
+                <div style="font-size:10px; color:#2b6cb0; margin-top:4px;">🎯 Action: Go Long (Stop below consolidation)</div>
             </div>
             
             <div id="box-uptrend" class="cycle-box">
                 <h3>3. 上升趋势</h3>
                 <p>Price > 20 EMA<br>Crossback / Break / Exhaustion</p>
                 <span class="book-def">"Ride the moving averages higher... Buy against the moving averages." (Page 14)</span>
-                <button class="detail-btn" onclick="toggleDetail('detail-uptrend')">量化标准 ▼</button>
+                <button class="detail-btn" onclick="toggleDetail('detail-uptrend')">标准与建议 ▼</button>
             </div>
             
             <div id="box-wedgedrop" class="cycle-box bearish">
                 <h3>4. 楔形下跌</h3>
                 <p>昨日 > 20 EMA<br>今日 < 20 EMA</p>
                 <span class="book-def">"Price 'drops' back down through the 10/20 EMA... End to the trend." (Page 12)</span>
+                <div style="font-size:10px; color:#e53e3e; margin-top:4px;">🛑 Action: Sell/Exit (Stop loss hit)</div>
             </div>
 
             <div id="detail-reversal" class="detail-card">
                 <strong>🔍 Reversal Extension (Page 9)</strong>
-                <p style="font-size:12px; color:#666;">量化逻辑基于 Process Reversal Extension 步骤 B, C, D</p>
+                <p style="font-size:12px; color:#666;">Process Steps A, B, C, D</p>
                 
                 <ul class="criteria-list">
                     <li>
                         <div class="logic-row">
-                            <span class="logic-title">1. 均线空间 (Air)</span>
+                            <span class="logic-title">A. 大周期支撑 (Higher Timeframe)</span>
+                            <div><span class="status-check check-manual">需人工查看</span></div>
+                        </div>
+                        <div class="book-quote">
+                            "Look for a defined support level on a higher timeframe." (Page 9)<br>
+                            <span style="font-size:11px; color:#a0aec0;">*注: 必须人工确认周线/月线支撑。</span>
+                        </div>
+                    </li>
+
+                    <li>
+                        <div class="logic-row">
+                            <span class="logic-title">B. 均线空间 (Air)</span>
                             <div>
                                 <span class="math-logic">Price &lt; 10 EMA</span> 
                                 <span id="rev-check-air" class="status-check">--</span>
                             </div>
                         </div>
                         <div class="book-quote">
-                            书中标准: "Must be extended from the 10 EMA... air between price and the moving average." (Page 9)
+                            "Must be extended from the 10 EMA... air between price and the moving average." (Page 9)
                         </div>
                     </li>
+
                     <li>
                         <div class="logic-row">
-                            <span class="logic-title">2. 恐慌放量 (Capitulation)</span>
+                            <span class="logic-title">C/D. 反转 K 线 + 恐慌放量</span>
                             <div>
-                                <span class="math-logic">Vol &gt; Avg Vol</span> 
-                                <span id="rev-check-vol" class="status-check">--</span>
+                                <span class="math-logic">Yang + Vol</span> 
+                                <span id="rev-check-combo" class="status-check">--</span>
                             </div>
                         </div>
                         <div class="book-quote">
-                            书中标准: "Heavy volume capitulation on the reversal bar is a key ingredient." (Page 9)
-                        </div>
-                    </li>
-                    <li>
-                        <div class="logic-row">
-                            <span class="logic-title">3. 反转 K 线 (Reversal Bar)</span>
-                            <div>
-                                <span class="math-logic">Close &gt; Open (阳线)</span> 
-                                <span id="rev-check-bar" class="status-check">--</span>
-                            </div>
-                        </div>
-                        <div class="book-quote">
-                            书中标准: "When the stock starts to put in a reversal bar... go long." (Page 9)
+                            "Starts to put in a reversal bar... Heavy volume capitulation is a key ingredient." (Page 9)<br>
+                            <span class="action-tag">ACTION</span> <strong>Go Long (做多)</strong>. <br>
+                            <span class="action-tag">STOP</span> Below the low of the reversal bar area.
                         </div>
                     </li>
                 </ul>
@@ -173,42 +184,43 @@
                 <ul class="criteria-list">
                     <li>
                         <div class="logic-row">
-                            <span class="logic-title">[买入] EMA Crossback (回踩)</span>
+                            <span class="logic-title">均线回踩 (EMA Crossback)</span>
                             <div>
                                 <span class="math-logic">Low &le; 10/20 EMA</span>
                                 <span id="up-check-cross" class="status-check">--</span>
                             </div>
                         </div>
                         <div class="book-quote">
-                            书中标准: "Price pulls back into the 10/20 EMA... Buy the stock against the 10/20 EMA." (Page 13, 16)
-                            <br>逻辑: 寻找书中所述的 "Tag" (触碰) 或 "Undercut" (刺破)。
+                            "Buy the stock against the 10/20 EMA." (Page 13)<br>
+                            <span class="action-tag">ACTION</span> <strong>Buy / Add (买入/加仓)</strong>.<br>
+                            <span class="action-tag">STOP</span> Below the moving averages.
                         </div>
                     </li>
 
                     <li>
                         <div class="logic-row">
-                            <span class="logic-title">[买入] Base n' Break (突破)</span>
+                            <span class="logic-title">平台突破 (Base Breakout)</span>
                             <div>
                                 <span class="math-logic">Close &gt; 20日最高价</span>
                                 <span id="up-check-break" class="status-check">--</span>
                             </div>
                         </div>
                         <div class="book-quote">
-                            书中标准: "Confirmation adds on the base breakout... Clears a descending trendline." (Page 14, 38)
-                            <br>逻辑: 使用"20日新高"作为平台突破(Breakout)的量化代理。
+                            "Confirmation adds on the base breakout." (Page 14)<br>
+                            <span class="action-tag">ACTION</span> <strong>Add (加仓)</strong>.
                         </div>
                     </li>
 
                     <li>
                         <div class="logic-row">
-                            <span class="logic-title">[止盈] Exhaustion (力竭)</span>
+                            <span class="logic-title">力竭延展 (Exhaustion)</span>
                             <div>
                                 <span id="up-check-ext-val" class="math-logic" style="color:#333">--</span>
                             </div>
                         </div>
                         <div class="book-quote">
-                            书中标准: "The second extension... good place to take profits. Third extension... end to the trend." (Page 11, 41)
-                            <br>逻辑: 展示延伸率供人工判断是第几次延伸。
+                            "2nd extension: take profits. 3rd extension: end to the trend." (Page 11, 41)<br>
+                            <span class="action-tag">ACTION</span> <strong>Take Profits (第2/3次时止盈)</strong>.
                         </div>
                     </li>
                 </ul>
@@ -283,7 +295,7 @@
         try {
             // ★ Vercel版: 
             const response = await fetch(`/api/stock?symbol=${symbol}`);
-            // ★ 本地测试版 (解开填Key):
+            // ★ 本地测试版 (解开并填入Key):
             // const apiKey = "YOUR_KEY";
             // const response = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`);
 
@@ -340,11 +352,17 @@
             // ------------------------------------------------
             const isAir = curPrice < curEma10; 
             const isCapitulation = curVol > curAvgVol;
-            const isReversalBar = curPrice > curOpen; 
+            const isReversalBar = curPrice > curOpen; // 阳线
 
             setCheck("rev-check-air", isAir, isAir ? "YES" : "NO");
-            setCheck("rev-check-vol", isCapitulation, isCapitulation ? "YES" : "NO");
-            setCheck("rev-check-bar", isReversalBar, isReversalBar ? "YES (阳线)" : "NO");
+            // 组合显示 C+D
+            if (isCapitulation && isReversalBar) {
+                setCheck("rev-check-combo", true, "YES (放量阳线)");
+            } else if (!isReversalBar) {
+                setCheck("rev-check-combo", false, "NO (非阳线)");
+            } else {
+                setCheck("rev-check-combo", false, "NO (未放量)");
+            }
 
             // ------------------------------------------------
             // 3. Uptrend 逻辑 (Page 13-14)
@@ -396,5 +414,3 @@
 
 </body>
 </html>
-
-```
