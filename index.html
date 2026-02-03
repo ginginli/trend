@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oliver Kell 策略分析器 (Vercel 版)</title>
+    <style>
+        /* 样式保持不变，为了篇幅省略，直接用之前的 CSS */
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f5f7fa; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; }
+        .input-group { margin-bottom: 20px; display: flex; gap: 10px; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 6px; flex: 1; font-size: 16px; }
+        button { padding: 12px 24px; background-color: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        #result { margin-top: 30px; display: none; }
+        .status-box { padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .status-bullish { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-bearish { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status-neutral { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .metric-item { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .metric-value { font-size: 20px; font-weight: bold; margin-top: 5px; }
+        .signal-badge { display: inline-block; padding: 5px 10px; border-radius: 20px; font-size: 14px; font-weight: bold; margin-top: 5px; background: #eee;}
+        .signal-buy { background-color: #27ae60; color: white; }
+        .signal-sell { background-color: #c0392b; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>📊 Oliver Kell 策略分析器</h1>
+    <p style="color: #666; margin-bottom: 25px;">安全版：API Key 已在服务器端加密保护。</p>
+    
+    <div class="input-group">
+        <input type="text" id="symbol" placeholder="股票代码 (例如: AAPL)" value="TSLA">
+        <button id="analyzeBtn" onclick="analyzeStock()">开始分析</button>
+    </div>
+    <div id="errorMsg" style="color: red; margin-top: 10px; display: none;"></div>
+
+    <div id="result">
+        <div id="statusBox" class="status-box">
+            <h2 id="trendTitle" style="margin: 0 0 10px 0;">--</h2>
+            <p id="trendDesc" style="margin: 0;"></p>
+            <div id="signalContainer" style="margin-top:10px;"></div>
+        </div>
+        <div class="metric-grid">
+            <div class="metric-item"><div>当前价格</div><div class="metric-value" id="priceVal">--</div></div>
+            <div class="metric-item"><div>10 日 EMA</div><div class="metric-value" id="ema10Val">--</div></div>
+            <div class="metric-item"><div>20 日 EMA</div><div class="metric-value" id="ema20Val">--</div></div>
+            <div class="metric-item"><div>乖离率</div><div class="metric-value" id="extensionVal">--</div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // EMA 计算逻辑保持不变
+    function calculateEMA(prices, period) {
+        const k = 2 / (period + 1);
+        let emaArray = [prices.slice(0, period).reduce((a,b)=>a+b,0)/period];
+        for(let i = period; i < prices.length; i++) {
+            emaArray.push((prices[i] * k) + (emaArray[emaArray.length - 1] * (1 - k)));
+        }
+        return emaArray;
+    }
+
+    async function analyzeStock() {
+        const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+        const btn = document.getElementById('analyzeBtn');
+        const errorDiv = document.getElementById('errorMsg');
+        const resultDiv = document.getElementById('result');
+
+        btn.disabled = true;
+        btn.textContent = "分析中...";
+        errorDiv.style.display = 'none';
+        resultDiv.style.display = 'none';
+
+        try {
+            // ★★★ 核心修改：这里不再直接请求 alphavantage，而是请求你的后端 api ★★★
+            const response = await fetch(`/api/stock?symbol=${symbol}`);
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || "请求失败");
+            if (data["Error Message"]) throw new Error("无效的代码");
+            if (data["Note"]) throw new Error("API 频率限制，请稍后再试");
+            
+            const timeSeries = data["Time Series (Daily)"];
+            if (!timeSeries) throw new Error("无法获取数据");
+
+            // 数据处理逻辑与之前完全一致
+            const dates = Object.keys(timeSeries).sort(); 
+            const prices = dates.map(date => parseFloat(timeSeries[date]["4. close"]));
+            if (prices.length < 50) throw new Error("历史数据不足");
+
+            const ema10Array = calculateEMA(prices, 10);
+            const ema20Array = calculateEMA(prices, 20);
+            const currentPrice = prices[prices.length - 1];
+            const prevPrice = prices[prices.length - 2];
+            
+            // 对齐数据
+            const currentEma10 = ema10Array[ema10Array.length - 1];
+            const currentEma20 = ema20Array[ema20Array.length - 1];
+            const prevEma20 = ema20Array[ema20Array.length - 2];
+
+            // 策略判断逻辑
+            let statusClass = "status-neutral";
+            let trendText = "震荡/中性";
+            let trendDesc = "方向不明确";
+            let signals = [];
+
+            const isAbove20 = currentPrice > currentEma20;
+            const isAbove10 = currentPrice > currentEma10;
+
+            if (isAbove20 && isAbove10) {
+                statusClass = "status-bullish";
+                trendText = "🚀 上升趋势 (Phase 2)";
+                trendDesc = "站稳 10/20 EMA 之上";
+            } else if (!isAbove20) {
+                statusClass = "status-bearish";
+                trendText = "🔻 下跌趋势";
+                trendDesc = "位于 20 EMA 下方";
+            }
+
+            if (prevPrice < prevEma20 && currentPrice > currentEma20) signals.push({type:'buy', text:"Wedge Pop (买点)"});
+            if (isAbove20 && currentPrice <= currentEma10*1.01 && currentPrice > currentEma20) signals.push({type:'buy', text:"EMA Crossback (低吸)"});
+            if (prevPrice > prevEma20 && currentPrice < currentEma20) signals.push({type:'sell', text:"Wedge Drop (卖出)"});
+            
+            const extension = (currentPrice - currentEma10) / currentEma10;
+            if (extension > 0.15) signals.push({type:'sell', text:`⚠️ 延伸过度 ${(extension*100).toFixed(1)}%`});
+
+            // 渲染
+            document.getElementById('statusBox').className = "status-box " + statusClass;
+            document.getElementById('trendTitle').textContent = trendText;
+            document.getElementById('trendDesc').textContent = trendDesc;
+            document.getElementById('priceVal').textContent = "$" + currentPrice.toFixed(2);
+            document.getElementById('ema10Val').textContent = "$" + currentEma10.toFixed(2);
+            document.getElementById('ema20Val').textContent = "$" + currentEma20.toFixed(2);
+            document.getElementById('extensionVal').textContent = (extension * 100).toFixed(1) + "%";
+
+            const sigCont = document.getElementById('signalContainer');
+            sigCont.innerHTML = '';
+            signals.forEach(sig => {
+                const b = document.createElement('div');
+                b.className = `signal-badge ${sig.type==='buy'?'signal-buy':'signal-sell'}`;
+                b.textContent = sig.text;
+                sigCont.appendChild(b);
+            });
+            resultDiv.style.display = 'block';
+
+        } catch (err) {
+            errorDiv.textContent = "错误: " + err.message;
+            errorDiv.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "开始分析";
+        }
+    }
+</script>
+</body>
+</html>
