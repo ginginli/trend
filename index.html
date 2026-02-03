@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oliver Kell 策略分析器 (书本复核版)</title>
+    <title>Oliver Kell 策略分析器 (Final Version)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; background-color: #f4f6f8; color: #333; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
@@ -25,6 +25,7 @@
         .cycle-box h3 { margin: 0 0 5px 0; font-size: 15px; color: #2d3748; }
         .cycle-box p { margin: 0; font-size: 12px; color: #718096; line-height: 1.4; }
         
+        /* 激活状态 */
         .cycle-box.active { opacity: 1; border-color: #3182ce; background-color: #ebf8ff; box-shadow: 0 4px 6px rgba(49, 130, 206, 0.2); transform: translateY(-2px); }
         .cycle-box.bearish.active { border-color: #e53e3e; background-color: #fff5f5; }
         .cycle-box.bearish.active h3 { color: #c53030; }
@@ -67,6 +68,10 @@
 
         #errorMsg { color: #e53e3e; margin-top: 10px; display: none; }
         #result { display: none; }
+        
+        @media (max-width: 768px) {
+            .cycle-container { grid-template-columns: 1fr 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -154,7 +159,6 @@
                     </ul>
                 </div>
             </div>
-
         </div>
 
         <div class="metric-grid">
@@ -187,8 +191,11 @@
     }
 
     function calculateEMA(prices, period) {
+        if (prices.length < period) return [];
         const k = 2 / (period + 1);
+        // 先算第一个SMA作为起点
         let emaArray = [prices.slice(0, period).reduce((a,b)=>a+b,0)/period];
+        // 后续计算
         for(let i = period; i < prices.length; i++) {
             emaArray.push((prices[i] * k) + (emaArray[emaArray.length - 1] * (1 - k)));
         }
@@ -198,7 +205,7 @@
     function calculateAvgVol(volumes, period) {
         let avgArray = [];
         for (let i = 0; i < volumes.length; i++) {
-            if (i < period - 1) avgArray.push(0);
+            if (i < period - 1) avgArray.push(0); // 补0对齐长度
             else {
                 const slice = volumes.slice(i - period + 1, i + 1);
                 avgArray.push(slice.reduce((a, b) => a + b, 0) / period);
@@ -217,20 +224,19 @@
         btn.textContent = "分析中...";
         errorDiv.style.display = 'none';
         
-        // 重置 UI
         document.querySelectorAll('.cycle-box').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.detail-card').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.status-check').forEach(el => { el.textContent = "--"; el.className = "status-check"; });
 
         try {
-            // ★ Vercel版: const response = await fetch(`/api/stock?symbol=${symbol}`);
-            // ★ 本地版: (填入Key)
-            // const apiKey = "YOUR_KEY_HERE";
-            // const response = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`);
+            // ★ Vercel版路径:
             const response = await fetch(`/api/stock?symbol=${symbol}`);
+            // ★ 如果在本地测试，请注释上面一行，解开下面两行并填入Key:
+            // const apiKey = "你的KEY";
+            // const response = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`);
 
             const data = await response.json();
-            if (!data["Time Series (Daily)"]) throw new Error("无法获取数据");
+            if (!data["Time Series (Daily)"]) throw new Error("无法获取数据或API受限");
 
             const timeSeries = data["Time Series (Daily)"];
             const dates = Object.keys(timeSeries).sort(); 
@@ -239,32 +245,40 @@
             const volumes = dates.map(d => parseFloat(timeSeries[d]["5. volume"]));
             const lows = dates.map(d => parseFloat(timeSeries[d]["3. low"]));
 
-            if (prices.length < 50) throw new Error("数据不足");
+            if (prices.length < 50) throw new Error("数据不足 (至少需要50天)");
 
+            // 计算指标
             const ema10 = calculateEMA(prices, 10);
             const ema20 = calculateEMA(prices, 20);
             const avgVol20 = calculateAvgVol(volumes, 20);
 
-            // 获取最新数据
-            const i = prices.length - 1;
-            const curPrice = prices[i];
-            const prevPrice = prices[i - 1];
-            const curEma10 = ema10[i];
-            const curEma20 = ema20[i];
-            const prevEma20 = ema20[i - 1];
-            const curLow = lows[i];
-            const curVol = volumes[i];
-            const curAvgVol = avgVol20[i];
+            // ============================================
+            // ★ 数据对齐与提取 (Fix: toFixed error)
+            // ============================================
+            const lastIdx = prices.length - 1;
+            
+            const curPrice = prices[lastIdx];
+            const prevPrice = prices[lastIdx - 1];
+            const curLow = lows[lastIdx];
+            const curVol = volumes[lastIdx];
+            const curAvgVol = avgVol20[lastIdx];
+
+            // EMA数组长度可能不同，取各自的最后一位
+            const curEma10 = ema10.length > 0 ? ema10[ema10.length - 1] : 0;
+            const curEma20 = ema20.length > 0 ? ema20[ema20.length - 1] : 0;
+            const prevEma20 = ema20.length > 1 ? ema20[ema20.length - 2] : 0;
+
+            if (!curEma10 || !curEma20) throw new Error("均线计算失败");
 
             // ------------------------------------------------
             // 1. 判断核心周期 (Strict Logic)
             // ------------------------------------------------
             let activeBoxId = "";
-            // Wedge Drop: 昨日 > 20, 今日 < 20 (严格跌破)
+            // Wedge Drop: 昨日 > 20, 今日 < 20
             if (prevPrice >= prevEma20 && curPrice < curEma20) activeBoxId = "box-wedgedrop";
-            // Wedge Pop: 昨日 < 20, 今日 > 20 (严格站上)
+            // Wedge Pop: 昨日 < 20, 今日 > 20
             else if (prevPrice < prevEma20 && curPrice > curEma20) activeBoxId = "box-wedgepop";
-            // Uptrend: 价格 > 20 (书中定义)
+            // Uptrend: 价格 > 20
             else if (curPrice >= curEma20) activeBoxId = "box-uptrend";
             // Downtrend: 价格 < 20
             else activeBoxId = "box-downtrend";
@@ -285,13 +299,11 @@
             // ------------------------------------------------
             // 3. Uptrend Setup 逻辑复核 (Strict)
             // ------------------------------------------------
-            // Logic A: Crossback (Tag or Undercut 10/20 EMA)
-            // 移除人为的 1.005 缓冲，改为严格的小于等于
+            // Logic A: Crossback (Tag/Undercut 10 or 20 EMA)
             const isCrossback = (curLow <= curEma10) || (curLow <= curEma20);
             
-            // Logic B: Base Breakout (New Highs)
-            // 书中 Flat Base 约 5-6 周。取 20 天作为"短期新高"的代理。
-            const past20Highs = prices.slice(i - 20, i); 
+            // Logic B: Base Breakout (New Highs over past 20 days)
+            const past20Highs = prices.slice(lastIdx - 20, lastIdx); 
             const periodHigh = Math.max(...past20Highs);
             const isBreakout = curPrice > periodHigh;
 
@@ -313,7 +325,8 @@
             resultDiv.style.display = 'block';
 
         } catch (err) {
-            errorDiv.textContent = err.message;
+            console.error(err);
+            errorDiv.textContent = "运行错误: " + err.message;
             errorDiv.style.display = 'block';
         } finally {
             btn.disabled = false;
